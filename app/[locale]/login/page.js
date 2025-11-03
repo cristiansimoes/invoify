@@ -51,7 +51,15 @@ const LoginPage = () => {
         </form>
 
         <p style={{ marginTop: '15px', fontSize: '12px', textAlign: 'center' }}>
-            Ainda não tem conta? <a href="#" style={{ color: '#0070f3' }}>Cadastre-se</a>
+            Ainda não tem conta? 
+            <a 
+                href="https://buy.stripe.com/aFacN5f272qUdQM1Xa3Je01" 
+                style={{ color: '#0070f3', fontWeight: 'bold' }} 
+                target="_blank" 
+                rel="noopener noreferrer"
+            >
+               Assine Agora por R$ 19,90/mês
+            </a>
         </p>
       </div>
     </div>
