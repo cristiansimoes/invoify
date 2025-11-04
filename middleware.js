@@ -1,25 +1,34 @@
-// middleware.js
 import { clerkMiddleware } from "@clerk/nextjs/server";
-import createMiddleware from "next-intl/middleware";
+import createIntlMiddleware from "next-intl/middleware";
 
-const intl = createMiddleware({
+// i18n config
+const intlMiddleware = createIntlMiddleware({
   locales: ["en", "pt-BR"],
   defaultLocale: "en",
 });
 
-export default clerkMiddleware({
-  publicRoutes: [
-    "/",
-    "/:locale",
-    "/:locale/login",
-    "/:locale/sign-up",
-    "/:locale/test-clerk",
-    "/(.*)_clerk(.*)",
-    "/:locale/(.*)_clerk(.*)",
-  ],
-  beforeAuth: (req) => intl(req),
-});
+const publicRoutes = [
+  "/",
+  "/:locale",
+  "/:locale/login",
+  "/:locale/sign-up",
+];
 
+// ✅ Middleware combinado
+export default function middleware(req) {
+  const { pathname } = req.nextUrl;
+
+  // ✅ NUNCA tocar nas rotas API
+  if (pathname.startsWith("/api")) {
+    return clerkMiddleware()(req); // protege, mas não aplica locale
+  }
+
+  return clerkMiddleware({
+    publicRoutes
+  })(req, evt => intlMiddleware(req));
+}
+
+// ✅ Matcher correto (não pega assets)
 export const config = {
-  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+  matcher: ["/((?!_next|.*\\..*).*)"],
 };
