@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 
 const STRIPE_URL = "https://buy.stripe.com/aFacN5f272qUdQM1Xa3Je01";
-
-// Free invoices allowed before upgrade required
 const FREE_INVOICE_LIMIT = 1;
 
-export default function PaywallGate({ children }) {
+interface PaywallGateProps {
+  children: ReactNode;
+}
+
+export default function PaywallGate({ children }: PaywallGateProps) {
   const { user, isLoaded } = useUser();
   const [usedFreeInvoices, setUsedFreeInvoices] = useState(0);
 
@@ -20,37 +22,37 @@ export default function PaywallGate({ children }) {
   if (!isLoaded) return null;
 
   const isPaid = user?.publicMetadata?.isPaid === true;
-  const exceededFreeLimit = !isPaid && usedFreeInvoices >= FREE_INVOICE_LIMIT;
+  const isBlocked = !isPaid && usedFreeInvoices >= FREE_INVOICE_LIMIT;
 
-  if (exceededFreeLimit) {
+  if (isBlocked) {
     return (
       <div style={{ textAlign: "center", padding: 40, maxWidth: 480, margin: "80px auto" }}>
-        <h2 style={{ fontSize: 26, marginBottom: 10 }}>🚀 Free Invoice Used</h2>
-        <p style={{ marginBottom: 20 }}>
-          You have used your free invoice. Upgrade to continue creating invoices.
-        </p>
+        <h2 style={{ fontSize: 26, marginBottom: 10 }}>🚀 Your free invoice is over</h2>
+        <p style={{ marginBottom: 20 }}>Upgrade to generate unlimited invoices.</p>
 
-        <button
-          onClick={() => (window.location.href = STRIPE_URL)}
+        <a
+          href={STRIPE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           style={{
             padding: "12px 20px",
             background: "#0070f3",
             color: "#fff",
             borderRadius: 8,
+            display: "inline-block",
             fontSize: 16,
             fontWeight: 600,
-            cursor: "pointer",
           }}
         >
-          Upgrade — R$ 19,90/month
-        </button>
+          Subscribe
+        </a>
 
         <p style={{ marginTop: 18, fontSize: 12, opacity: 0.7 }}>
-          After payment, refresh the page (MVP unlock).
+          After payment, refresh the page. (MVP)
         </p>
       </div>
     );
   }
 
-  return children;
+  return <>{children}</>;
 }
