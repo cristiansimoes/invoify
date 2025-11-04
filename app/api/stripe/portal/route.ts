@@ -1,17 +1,16 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { headers } from "next/headers";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-export async function POST(req: Request) {
-  const { userId } = getAuth(req);
+export async function POST() {
+  const { userId } = auth();
 
   if (!userId) {
-    console.log("❌ No user in getAuth()");
+    console.log("❌ No user in auth()");
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
