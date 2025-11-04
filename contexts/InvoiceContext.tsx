@@ -129,7 +129,7 @@ export const InvoiceContextProvider = ({
       return;
     }
 
-    localStorage.setItem("invoice_count", count + 1);
+    localStorage.setItem("invoice_count", String(count + 1));
 
     generatePdf(data);
   };
