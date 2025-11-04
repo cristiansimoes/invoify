@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { ClerkProvider } from "@clerk/nextjs";
 
 // RHF
 import { FormProvider, useForm } from "react-hook-form";
@@ -26,14 +27,12 @@ import {
   LOCAL_STORAGE_INVOICE_DRAFT_KEY,
 } from "@/lib/variables";
 
-// Helpers
 const readDraftFromLocalStorage = (): InvoiceType | null => {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(LOCAL_STORAGE_INVOICE_DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // revive dates
     if (parsed?.details) {
       if (parsed.details.invoiceDate)
         parsed.details.invoiceDate = new Date(parsed.details.invoiceDate);
@@ -56,30 +55,30 @@ const Providers = ({ children }: ProvidersProps) => {
     defaultValues: FORM_DEFAULT_VALUES,
   });
 
-  // Hydrate once on mount
   useEffect(() => {
     const draft = readDraftFromLocalStorage();
     if (draft) {
       form.reset(draft, { keepDefaultValues: false });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <TranslationProvider>
-        <FormProvider {...form}>
-          <InvoiceContextProvider>
-            <ChargesContextProvider>{children}</ChargesContextProvider>
-          </InvoiceContextProvider>
-        </FormProvider>
-      </TranslationProvider>
-    </ThemeProvider>
+    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <TranslationProvider>
+          <FormProvider {...form}>
+            <InvoiceContextProvider>
+              <ChargesContextProvider>{children}</ChargesContextProvider>
+            </InvoiceContextProvider>
+          </FormProvider>
+        </TranslationProvider>
+      </ThemeProvider>
+    </ClerkProvider>
   );
 };
 
