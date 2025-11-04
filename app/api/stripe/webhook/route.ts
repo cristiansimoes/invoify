@@ -1,12 +1,12 @@
 import Stripe from "stripe";
-import { getClerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs";
 import { headers } from "next/headers";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: Request) {
   const body = await req.text();
-  const head = await headers();
+  const head = headers();
   const signature = head.get("stripe-signature") as string;
 
   try {
@@ -21,30 +21,30 @@ export async function POST(req: Request) {
       const email = session.customer_details?.email;
 
       if (!email) {
-        console.log("⚠️ No email from Stripe session");
-        return new Response("ok", { status: 200 });
+        console.log("⚠️ No email returned from Stripe checkout");
+        return new Response("OK");
       }
 
-      const clerk = await getClerkClient();
-      const users = await clerk.users.getUserList({
+      // ✅ Buscar usuário no Clerk pelo email
+      const users = await clerkClient.users.getUserList({
         emailAddress: [email],
       });
 
       if (users.length > 0) {
-        await clerk.users.updateUser(users[0].id, {
+        await clerkClient.users.updateUser(users[0].id, {
           publicMetadata: { isPaid: true },
         });
 
         console.log("✅ User upgraded:", email);
       } else {
-        console.log("⚠️ User not found in Clerk:", email);
+        console.log("⚠️ No user found for email:", email);
       }
     }
 
-    return new Response("OK", { status: 200 });
+    return new Response("OK");
 
   } catch (err) {
-    console.error("❌ Webhook error:", err);
-    return new Response("Webhook error", { status: 400 });
+    console.error("❌ Stripe Webhook Error:", err);
+    return new Response("Invalid signature", { status: 400 });
   }
 }
