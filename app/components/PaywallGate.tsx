@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 
-const STRIPE_URL = "https://buy.stripe.com/aFacN5f272qUdQM1Xa3Je01"; // ✅ Your Stripe link
+const STRIPE_URL = "https://buy.stripe.com/aFacN5f272qUdQM1Xa3Je01";
 const FREE_INVOICE_LIMIT = 1;
 
 interface PaywallGateProps {
@@ -25,15 +25,14 @@ export default function PaywallGate({ children }: PaywallGateProps) {
   const isBlocked = !isPaid && usedFreeInvoices >= FREE_INVOICE_LIMIT;
 
   if (isBlocked) {
+    const uid = user?.id ?? "";
+    const email = user?.primaryEmailAddress?.emailAddress ?? "";
+    const checkoutUrl = `${STRIPE_URL}?client_reference_id=${encodeURIComponent(
+      uid
+    )}&prefilled_email=${encodeURIComponent(email)}`;
+
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: 40,
-          maxWidth: 480,
-          margin: "80px auto",
-        }}
-      >
+      <div style={{ textAlign: "center", padding: 40, maxWidth: 480, margin: "80px auto" }}>
         <h2 style={{ fontSize: 28, marginBottom: 12, fontWeight: 700 }}>
           🚀 Your free invoice is used up
         </h2>
@@ -42,7 +41,7 @@ export default function PaywallGate({ children }: PaywallGateProps) {
         </p>
 
         <a
-          href={STRIPE_URL}
+          href={checkoutUrl}
           target="_blank"
           rel="noopener noreferrer"
           style={{
