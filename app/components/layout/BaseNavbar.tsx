@@ -43,7 +43,7 @@ const BaseNavbar = () => {
           <div className="flex items-center gap-3">
             <LanguageSelector />
             <ThemeSwitcher />
-            <AuthCorner locale={locale} />
+            <AuthCorner />
           </div>
         </Card>
       </nav>
