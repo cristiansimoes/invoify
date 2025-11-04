@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { clerkClient } from "@clerk/nextjs/server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16",
+  apiVersion: "2025-10-29.clover",
 });
 
 export async function POST(req: Request) {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as any;
-      const email = session.customer_details.email;
+      const email = session?.customer_details?.email;
 
       if (email) {
         const users = await clerkClient.users.getUserList({
@@ -27,18 +27,16 @@ export async function POST(req: Request) {
         });
 
         if (users.length > 0) {
-          await clerkClient.users.updateUser(users[0].id, {
+          await clerkClient.users.updateUserMetadata(users[0].id, {
             publicMetadata: { isPaid: true },
           });
-
-          console.log("✅ User upgraded:", email);
         }
       }
     }
 
     return new Response("OK", { status: 200 });
-  } catch (e) {
-    console.error("❌ Webhook error:", e);
+  } catch (err) {
+    console.error("❌ Stripe webhook error:", err);
     return new Response("Webhook error", { status: 400 });
   }
 }
