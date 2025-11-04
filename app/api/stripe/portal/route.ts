@@ -7,7 +7,7 @@ import { headers } from "next/headers";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST() {
-  const { userId } = auth();
+  const { userId } = await auth(); // ✅ AQUI estava o problema
 
   if (!userId) {
     console.log("❌ No user in auth()");
