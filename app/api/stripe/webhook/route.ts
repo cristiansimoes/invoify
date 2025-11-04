@@ -1,18 +1,18 @@
 import Stripe from "stripe";
-import { clerkClient } from "@clerk/nextjs";
 import { headers } from "next/headers";
+import { Clerk } from "@clerk/clerk-sdk-node";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const clerk = new Clerk({ secretKey: process.env.CLERK_SECRET_KEY! });
 
 export async function POST(req: Request) {
   const body = await req.text();
-  const head = headers();
-  const signature = head.get("stripe-signature") as string;
+  const sig = headers().get("stripe-signature") as string;
 
   try {
     const event = stripe.webhooks.constructEvent(
       body,
-      signature,
+      sig,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
 
@@ -20,31 +20,30 @@ export async function POST(req: Request) {
       const session = event.data.object as any;
       const email = session.customer_details?.email;
 
+      console.log("✅ Stripe webhook: checkout session completed for", email);
+
       if (!email) {
-        console.log("⚠️ No email returned from Stripe checkout");
+        console.log("⚠️ No email received from Stripe");
         return new Response("OK");
       }
 
-      // ✅ Buscar usuário no Clerk pelo email
-      const users = await clerkClient.users.getUserList({
-        emailAddress: [email],
-      });
+      // ✅ Find user in Clerk by email
+      const users = await clerk.users.getUserList({ emailAddress: [email] });
 
       if (users.length > 0) {
-        await clerkClient.users.updateUser(users[0].id, {
+        await clerk.users.updateUser(users[0].id, {
           publicMetadata: { isPaid: true },
         });
 
-        console.log("✅ User upgraded:", email);
+        console.log("🎉 User upgraded:", email);
       } else {
-        console.log("⚠️ No user found for email:", email);
+        console.log("⚠️ No Clerk user found for", email);
       }
     }
 
     return new Response("OK");
-
   } catch (err) {
-    console.error("❌ Stripe Webhook Error:", err);
-    return new Response("Invalid signature", { status: 400 });
+    console.error("❌ Webhook error:", err);
+    return new Response("Webhook error", { status: 400 });
   }
 }
