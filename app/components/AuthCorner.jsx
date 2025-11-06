@@ -22,6 +22,17 @@ export default function AuthCorner() {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+
+      {/* ✅ Dashboard Btn (logged in only) */}
+      <SignedIn>
+        <Link
+          href={`/${locale}/dashboard`}
+          className="text-sm px-3 py-2 rounded-md border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
+        >
+          Dashboard
+        </Link>
+      </SignedIn>
+
       {isPaid && (
         <button
           onClick={openStripePortal}

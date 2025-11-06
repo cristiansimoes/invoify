@@ -11,49 +11,48 @@ const useToasts = () => {
     const newInvoiceSuccess = () => {
         toast({
             variant: "default",
-            title: "Generated new invoice",
-            description: "Successfully created a new invoice",
+            title: "New invoice created ✅",
+            description: "Start customizing it now.",
         });
     };
 
     const pdfGenerationSuccess = () => {
         toast({
             variant: "default",
-            title: "Your invoice has been generated!",
-            description:
-                "You can preview, download, or save it from the actions tab",
+            title: "Invoice ready ✨",
+            description: "Click the PDF button again to download your file.",
         });
     };
 
     const saveInvoiceSuccess = () => {
         toast({
             variant: "default",
-            title: "Saved Invoice",
-            description: "Your invoice details are saved now",
+            title: "Invoice saved 💾",
+            description: "Your invoice has been saved.",
         });
     };
 
     const modifiedInvoiceSuccess = () => {
         toast({
             variant: "default",
-            title: "Modified Invoice",
-            description: "Successfully modified your invoice",
+            title: "Invoice updated ✅",
+            description: "Changes have been saved.",
         });
     };
 
     const sendPdfSuccess = () => {
         toast({
             variant: "default",
-            title: "Email sent",
-            description: "Your invoice has been sent to the specified email",
+            title: "Sent! 📤",
+            description: "Your invoice was emailed successfully.",
         });
     };
 
     const sendPdfError = ({ email, sendPdfToMail }: SendErrorType) => {
         toast({
             variant: "destructive",
-            title: "Error",
-            description: "Something went wrong. Try again in a moment",
+            title: "Email failed ❌",
+            description: "Something went wrong. Try again.",
             action: (
                 <ToastAction
                     onClick={() => sendPdfToMail(email)}
@@ -68,8 +67,8 @@ const useToasts = () => {
     const importInvoiceError = () => {
         toast({
             variant: "destructive",
-            title: "Error",
-            description: "Something went importing the invoice. Make sure the file is a valid Invoify JSON export",
+            title: "Import failed ❌",
+            description: "Make sure the file is a valid FlukeFlow JSON export.",
         });
     };
 

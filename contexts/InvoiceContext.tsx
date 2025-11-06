@@ -10,67 +10,64 @@ import React, {
 } from "react";
 
 import { useRouter } from "next/navigation";
-
-// Clerk ✅
 import { useUser } from "@clerk/nextjs";
-
-// RHF
 import { useFormContext } from "react-hook-form";
 
-// Hooks
 import useToasts from "@/hooks/useToasts";
-
-// Services
 import { exportInvoice } from "@/services/invoice/client/exportInvoice";
 
-// Variables
 import {
   FORM_DEFAULT_VALUES,
   GENERATE_PDF_API,
   SEND_PDF_API,
-  SHORT_DATE_OPTIONS,
   LOCAL_STORAGE_INVOICE_DRAFT_KEY,
 } from "@/lib/variables";
 
-// Types
-import { ExportTypes, InvoiceType } from "@/types";
+import {
+  saveInvoiceLocal,
+  getInvoicesLocal,
+  getInvoiceByIdLocal,
+  deleteInvoiceLocal,
+  type InvoiceDTO,
+} from "@/lib/invoices-local";
 
-const defaultInvoiceContext = {
-  invoicePdf: new Blob(),
-  invoicePdfLoading: false,
-  savedInvoices: [] as InvoiceType[],
-  pdfUrl: null as string | null,
-  onFormSubmit: (values: InvoiceType) => {},
-  newInvoice: () => {},
-  generatePdf: async (data: InvoiceType) => {},
-  removeFinalPdf: () => {},
-  downloadPdf: () => {},
-  printPdf: () => {},
-  previewPdfInTab: () => {},
-  saveInvoice: () => {},
-  deleteInvoice: (index: number) => {},
-  sendPdfToMail: (email: string): Promise<void> => Promise.resolve(),
-  exportInvoiceAs: (exportAs: ExportTypes) => {},
-  importInvoice: (file: File) => {},
+import type { ExportTypes, InvoiceType } from "@/types";
+
+type Ctx = {
+  invoicePdf: Blob;
+  invoicePdfLoading: boolean;
+  pdfUrl: string | null;
+  savedInvoices: InvoiceDTO[];
+  onFormSubmit: (values: InvoiceType) => void;
+  newInvoice: () => void;
+  generatePdf: (data: InvoiceType) => Promise<void>;
+  removeFinalPdf: () => void;
+  downloadPdf: () => void;
+  printPdf: () => void;
+  previewPdfInTab: () => void;
+  saveInvoice: () => void;
+  deleteInvoiceById: (id: string | number) => void;
+  sendPdfToMail: (email: string) => Promise<void>;
+  exportInvoiceAs: (as: ExportTypes) => void;
+  importInvoice: (file: File) => void;
+  loadInvoiceById: (id: string | number) => InvoiceDTO | undefined;
+  reset: (data: InvoiceType) => void;
+  markInvoicePaid: (id: string | number) => void;
+  markInvoiceUnpaid: (id: string | number) => void; // 👈 novo
 };
 
-export const InvoiceContext = createContext(defaultInvoiceContext);
+const defaultCtx = {} as Ctx;
+export const InvoiceContext = createContext(defaultCtx);
+export const useInvoiceContext = () => useContext(InvoiceContext);
 
-export const useInvoiceContext = () => {
-  return useContext(InvoiceContext);
-};
-
-type InvoiceContextProviderProps = {
-  children: React.ReactNode;
-};
-
-export const InvoiceContextProvider = ({
-  children,
-}: InvoiceContextProviderProps) => {
+export const InvoiceContextProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
-  const { user } = useUser(); // ✅ pega usuário do Clerk
+  const { user } = useUser();
+  const { getValues, reset, watch } = useFormContext<InvoiceType>();
+  const [invoicePdf, setInvoicePdf] = useState<Blob>(new Blob());
+  const [invoicePdfLoading, setInvoicePdfLoading] = useState(false);
+  const [savedInvoices, setSavedInvoices] = useState<InvoiceDTO[]>([]);
 
-  // Toasts
   const {
     newInvoiceSuccess,
     pdfGenerationSuccess,
@@ -81,255 +78,238 @@ export const InvoiceContextProvider = ({
     importInvoiceError,
   } = useToasts();
 
-  const { getValues, reset, watch } = useFormContext<InvoiceType>();
+  /** ---- helpers ---- */
+  const extractItems = (data: any) => {
+    if (data?.details?.items) return data.details.items; // seu schema atual
+    return data?.items || data?.lineItems || data?.products || []; // fallbacks
+  };
 
-  const [invoicePdf, setInvoicePdf] = useState<Blob>(new Blob());
-  const [invoicePdfLoading, setInvoicePdfLoading] = useState<boolean>(false);
+  const calcTotal = (data: any) => {
+    const items = extractItems(data);
+    return items.reduce((acc: number, it: any) => {
+      const qty = Number(it.quantity ?? it.qty ?? 0);
+      const rate = Number(it.unitPrice ?? it.price ?? it.rate ?? 0);
+      const amount = Number(it.total ?? qty * rate);
+      return acc + (isNaN(amount) ? 0 : amount);
+    }, 0);
+  };
 
-  const [savedInvoices, setSavedInvoices] = useState<InvoiceType[]>([]);
+  const buildDTO = (d: InvoiceType): InvoiceDTO => {
+    const anyd: any = d;
+    return {
+      id: String(anyd.details?.invoiceNumber || "00001"),
+      // usa receiver.name como padrão (combina com o JSON que você mostrou),
+      // com fallbacks para outros possíveis campos
+      customerName:
+        anyd.receiver?.name ||
+        anyd.billTo?.name ||
+        anyd.client?.name ||
+        anyd.customer?.name ||
+        "Client",
+      total: calcTotal(anyd),
+      issueDate:
+        anyd.details?.invoiceDate || new Date().toISOString().slice(0, 10),
+      dueDate: anyd.details?.dueDate,
+      status: "unpaid",
+      data: d,
+    };
+  };
 
+  /** Rehidrata e normaliza tudo ao montar */
   useEffect(() => {
-    let savedInvoicesDefault;
-    if (typeof window !== undefined) {
-      const savedInvoicesJSON = window.localStorage.getItem("savedInvoices");
-      savedInvoicesDefault = savedInvoicesJSON
-        ? JSON.parse(savedInvoicesJSON)
-        : [];
-      setSavedInvoices(savedInvoicesDefault);
+    try {
+      const list = getInvoicesLocal();
+      const fixed = list.map((inv) => {
+        const newTotal = Number(calcTotal(inv.data));
+        return {
+          ...inv,
+          total: Number.isFinite(newTotal) ? newTotal : Number(inv.total) || 0,
+          status: (inv.status ?? "unpaid") as "paid" | "unpaid",
+        };
+      });
+      setSavedInvoices(fixed);
+    } catch {
+      setSavedInvoices([]);
     }
   }, []);
 
+  /** Auto-draft */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const subscription = watch((value) => {
-      try {
-        window.localStorage.setItem(
-          LOCAL_STORAGE_INVOICE_DRAFT_KEY,
-          JSON.stringify(value)
-        );
-      } catch {}
+    const sub = watch((value) => {
+      localStorage.setItem(
+        LOCAL_STORAGE_INVOICE_DRAFT_KEY,
+        JSON.stringify(value)
+      );
     });
-    return () => subscription.unsubscribe();
+    return () => sub.unsubscribe();
   }, [watch]);
 
-  const pdfUrl = useMemo(() => {
-    if (invoicePdf.size > 0) {
-      return window.URL.createObjectURL(invoicePdf);
-    }
-    return null;
-  }, [invoicePdf]);
+  const pdfUrl = useMemo(
+    () => (invoicePdf.size > 0 ? URL.createObjectURL(invoicePdf) : null),
+    [invoicePdf]
+  );
 
-  // ✅ PAGAMENTO + 1 Invoice grátis
+  /** Submit (nova invoice) */
   const onFormSubmit = (data: InvoiceType) => {
     const isPaid = user?.publicMetadata?.isPaid === true;
     const count = Number(localStorage.getItem("invoice_count") || 0);
 
     if (!isPaid && count >= 1) {
-      alert("🎉 Você já usou sua invoice gratuita! Assine para gerar mais.");
+      alert("🎉 You used your free invoice! Upgrade to continue.");
       return;
     }
 
     localStorage.setItem("invoice_count", String(count + 1));
 
+    const dto = buildDTO(data);
+    saveInvoiceLocal(dto);
+    setSavedInvoices(getInvoicesLocal());
+    saveInvoiceSuccess();
     generatePdf(data);
   };
 
   const newInvoice = () => {
     reset(FORM_DEFAULT_VALUES);
     setInvoicePdf(new Blob());
-
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(LOCAL_STORAGE_INVOICE_DRAFT_KEY);
-      } catch {}
-    }
-
+    localStorage.removeItem(LOCAL_STORAGE_INVOICE_DRAFT_KEY);
     router.refresh();
     newInvoiceSuccess();
   };
 
   const generatePdf = useCallback(async (data: InvoiceType) => {
     setInvoicePdfLoading(true);
-
     try {
-      const response = await fetch(GENERATE_PDF_API, {
+      const res = await fetch(GENERATE_PDF_API, {
         method: "POST",
         body: JSON.stringify(data),
       });
-
-      const result = await response.blob();
-      setInvoicePdf(result);
-
-      if (result.size > 0) {
-        pdfGenerationSuccess();
-      }
-    } catch (err) {
-      console.log(err);
+      const blob = await res.blob();
+      setInvoicePdf(blob);
+      if (blob.size > 0) pdfGenerationSuccess();
     } finally {
       setInvoicePdfLoading(false);
     }
   }, []);
 
-  const removeFinalPdf = () => {
-    setInvoicePdf(new Blob());
-  };
-
   const previewPdfInTab = () => {
-    if (invoicePdf) {
-      const url = window.URL.createObjectURL(invoicePdf);
-      window.open(url, "_blank");
-    }
+    if (invoicePdf.size > 0) window.open(URL.createObjectURL(invoicePdf), "_blank");
   };
 
   const downloadPdf = () => {
-    if (invoicePdf instanceof Blob && invoicePdf.size > 0) {
-      const url = window.URL.createObjectURL(invoicePdf);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "invoice.pdf";
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
+    if (invoicePdf.size === 0) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(invoicePdf);
+    a.download = "invoice.pdf";
+    a.click();
   };
 
   const printPdf = () => {
-    if (invoicePdf) {
-      const pdfUrl = URL.createObjectURL(invoicePdf);
-      const printWindow = window.open(pdfUrl, "_blank");
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
-    }
+    if (invoicePdf.size === 0) return;
+    const win = window.open(URL.createObjectURL(invoicePdf), "_blank");
+    win?.addEventListener("load", () => win.print());
   };
 
+  /** Save (edição) — preserva status existente */
   const saveInvoice = () => {
-    if (invoicePdf) {
-      if (getValues) {
-        const savedInvoicesJSON = localStorage.getItem("savedInvoices");
-        const savedInvoices = savedInvoicesJSON
-          ? JSON.parse(savedInvoicesJSON)
-          : [];
+    const data = getValues();
+    const id = String((data as any)?.details?.invoiceNumber);
+    const existing = id ? getInvoiceByIdLocal(id) : undefined;
 
-        const updatedDate = new Date().toLocaleDateString(
-          "en-US",
-          SHORT_DATE_OPTIONS
-        );
-
-        const formValues = getValues();
-        formValues.details.updatedAt = updatedDate;
-
-        const existingInvoiceIndex = savedInvoices.findIndex(
-          (invoice: InvoiceType) => {
-            return (
-              invoice.details.invoiceNumber === formValues.details.invoiceNumber
-            );
-          }
-        );
-
-        if (existingInvoiceIndex !== -1) {
-          savedInvoices[existingInvoiceIndex] = formValues;
-          modifiedInvoiceSuccess();
-        } else {
-          savedInvoices.push(formValues);
-          saveInvoiceSuccess();
+    const dto: InvoiceDTO = existing
+      ? {
+          ...existing,
+          data,
+          total: calcTotal(data),
+          // preserva status anterior
+          status: (existing.status ?? "unpaid") as "paid" | "unpaid",
         }
+      : buildDTO(data);
 
-        localStorage.setItem("savedInvoices", JSON.stringify(savedInvoices));
-
-        setSavedInvoices(savedInvoices);
-      }
-    }
+    saveInvoiceLocal(dto);
+    setSavedInvoices(getInvoicesLocal());
+    modifiedInvoiceSuccess();
   };
 
-  const deleteInvoice = (index: number) => {
-    if (index >= 0 && index < savedInvoices.length) {
-      const updatedInvoices = [...savedInvoices];
-      updatedInvoices.splice(index, 1);
-      setSavedInvoices(updatedInvoices);
-
-      const updatedInvoicesJSON = JSON.stringify(updatedInvoices);
-      localStorage.setItem("savedInvoices", updatedInvoicesJSON);
-    }
+  /** Mark as Paid — altera só o status, não mexe no total/data */
+  const markInvoicePaid = (id: string | number) => {
+    const inv = getInvoiceByIdLocal(String(id));
+    if (!inv) return;
+    const updated: InvoiceDTO = { ...inv, status: "paid" };
+    saveInvoiceLocal(updated);
+    setSavedInvoices(getInvoicesLocal());
   };
 
-  const sendPdfToMail = (email: string) => {
+    const markInvoiceUnpaid = (id: string | number) => {
+    const inv = getInvoiceByIdLocal(String(id));
+    if (!inv) return;
+
+    const updated: InvoiceDTO = { ...inv, status: "unpaid" };
+    saveInvoiceLocal(updated);
+    setSavedInvoices(getInvoicesLocal());
+  };
+
+
+  const deleteInvoiceById = (id: string | number) => {
+    deleteInvoiceLocal(String(id));
+    setSavedInvoices(getInvoicesLocal());
+  };
+
+  const sendPdfToMail = async (email: string) => {
     const fd = new FormData();
     fd.append("email", email);
     fd.append("invoicePdf", invoicePdf, "invoice.pdf");
-    fd.append("invoiceNumber", getValues().details.invoiceNumber);
+    fd.append("invoiceNumber", String(getValues().details.invoiceNumber));
 
-    return fetch(SEND_PDF_API, {
-      method: "POST",
-      body: fd,
-    })
-      .then((res) => {
-        if (res.ok) {
-          sendPdfSuccess();
-        } else {
-          sendPdfError({ email, sendPdfToMail });
-        }
-      })
-      .catch((error) => {
-        console.log(error);
-        sendPdfError({ email, sendPdfToMail });
-      });
+    try {
+      const res = await fetch(SEND_PDF_API, { method: "POST", body: fd });
+      if (res.ok) sendPdfSuccess();
+      else sendPdfError({ email, sendPdfToMail });
+    } catch {
+      sendPdfError({ email, sendPdfToMail });
+    }
   };
 
-  const exportInvoiceAs = (exportAs: ExportTypes) => {
-    const formValues = getValues();
-    exportInvoice(exportAs, formValues);
-  };
+  const exportInvoiceAs = (type: ExportTypes) => exportInvoice(type, getValues());
 
   const importInvoice = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = (e) => {
       try {
-        const importedData = JSON.parse(event.target?.result as string);
-
-        if (importedData.details) {
-          if (importedData.details.invoiceDate) {
-            importedData.details.invoiceDate = new Date(
-              importedData.details.invoiceDate
-            );
-          }
-          if (importedData.details.dueDate) {
-            importedData.details.dueDate = new Date(
-              importedData.details.dueDate
-            );
-          }
-        }
-
-        reset(importedData);
-      } catch (error) {
-        console.error("Error parsing JSON file:", error);
+        const data = JSON.parse(e.target?.result as string);
+        reset(data);
+      } catch {
         importInvoiceError();
       }
     };
     reader.readAsText(file);
   };
 
+  const loadInvoiceById = (id: string | number) => getInvoiceByIdLocal(String(id));
+
   return (
     <InvoiceContext.Provider
       value={{
         invoicePdf,
         invoicePdfLoading,
-        savedInvoices,
         pdfUrl,
+        savedInvoices,
         onFormSubmit,
         newInvoice,
         generatePdf,
-        removeFinalPdf,
+        removeFinalPdf: () => setInvoicePdf(new Blob()),
         downloadPdf,
         printPdf,
         previewPdfInTab,
         saveInvoice,
-        deleteInvoice,
+        deleteInvoiceById,
         sendPdfToMail,
         exportInvoiceAs,
         importInvoice,
+        loadInvoiceById,
+        reset,
+        markInvoicePaid,
+        markInvoiceUnpaid,
       }}
     >
       {children}

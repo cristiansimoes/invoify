@@ -22,14 +22,29 @@ import { useInvoiceContext } from "@/contexts/InvoiceContext";
 import { useTranslationContext } from "@/contexts/TranslationContext";
 
 // Icons
-import { FileInput, FolderUp, Import, Plus, RotateCcw } from "lucide-react";
+import { FileInput, FolderUp, Import, Plus, RotateCcw, Save } from "lucide-react";
+import { useEffect } from "react";
 
 const InvoiceActions = () => {
-  const { invoicePdfLoading, newInvoice } = useInvoiceContext();
-
+  const { invoicePdfLoading, newInvoice, saveInvoice, generatePdf } =
+    useInvoiceContext();
   const { _t } = useTranslationContext();
+
+  // ✅ Listener para PDF vindo do dashboard
+  useEffect(() => {
+  const handlePreview = (e: CustomEvent) => {
+    const data = e?.detail;
+    if (!data) return;
+    generatePdf(data);
+  };
+
+  window.addEventListener("previewInvoicePdf", handlePreview as EventListener);
+  return () =>
+    window.removeEventListener("previewInvoicePdf", handlePreview as EventListener);
+}, [generatePdf]);
+
   return (
-    <div className={`xl:w-[45%]`}>
+    <div className="xl:w-[45%]">
       <Card className="h-auto sticky top-0 px-2">
         <CardHeader>
           <CardTitle>{_t("actions.title")}</CardTitle>
@@ -37,46 +52,41 @@ const InvoiceActions = () => {
         </CardHeader>
 
         <div className="flex flex-col flex-wrap items-center gap-2">
+          {/* Load + Export */}
           <div className="flex flex-wrap gap-3">
-            {/* Load modal button */}
             <InvoiceLoaderModal>
               <BaseButton
                 variant="outline"
                 tooltipLabel="Open load invoice menu"
                 disabled={invoicePdfLoading}
               >
-                <FolderUp />
-                {_t("actions.loadInvoice")}
+                <FolderUp /> {_t("actions.loadInvoice")}
               </BaseButton>
             </InvoiceLoaderModal>
 
-            {/* Export modal button */}
             <InvoiceExportModal>
               <BaseButton
                 variant="outline"
-                tooltipLabel="Open load invoice menu"
+                tooltipLabel="Open export invoice menu"
                 disabled={invoicePdfLoading}
               >
-                <Import />
-                {_t("actions.exportInvoice")}
+                <Import /> {_t("actions.exportInvoice")}
               </BaseButton>
             </InvoiceExportModal>
           </div>
 
+          {/* New / Reset / Generate / Save */}
           <div className="flex flex-wrap gap-3">
-            {/* New invoice button */}
             <NewInvoiceAlert>
               <BaseButton
                 variant="outline"
                 tooltipLabel="Get a new invoice form"
                 disabled={invoicePdfLoading}
               >
-                <Plus />
-                {_t("actions.newInvoice")}
+                <Plus /> {_t("actions.newInvoice")}
               </BaseButton>
             </NewInvoiceAlert>
 
-            {/* Reset form button */}
             <NewInvoiceAlert
               title="Reset form?"
               description="This will clear all fields and the saved draft."
@@ -88,25 +98,31 @@ const InvoiceActions = () => {
                 tooltipLabel="Reset entire form"
                 disabled={invoicePdfLoading}
               >
-                <RotateCcw />
-                Reset Form
+                <RotateCcw /> Reset Form
               </BaseButton>
             </NewInvoiceAlert>
 
-            {/* Generate pdf button */}
             <BaseButton
               type="submit"
               tooltipLabel="Generate your invoice"
               loading={invoicePdfLoading}
               loadingText="Generating your invoice"
             >
-              <FileInput />
-              {_t("actions.generatePdf")}
+              <FileInput /> {_t("actions.generatePdf")}
+            </BaseButton>
+
+            <BaseButton
+              variant="outline"
+              tooltipLabel="Save this invoice"
+              onClick={saveInvoice}
+              disabled={invoicePdfLoading}
+            >
+              <Save /> Save Invoice
             </BaseButton>
           </div>
 
+          {/* PDF Preview */}
           <div className="w-full">
-            {/* Live preview and Final pdf */}
             <PdfViewer />
           </div>
         </div>
