@@ -1,173 +1,125 @@
 "use client";
 
 import React from "react";
-
-// RHF
 import { useFormContext } from "react-hook-form";
-
-// ShadCn
 import { Card, CardContent } from "@/components/ui/card";
-
-// Components
 import { BaseButton } from "@/app/components";
-
-// Contexts
 import { useInvoiceContext } from "@/contexts/InvoiceContext";
-
-// Helpers
 import { formatNumberWithCommas } from "@/lib/helpers";
 
-// Variables
-import { DATE_OPTIONS } from "@/lib/variables";
-
-// Types
 import { InvoiceType } from "@/types";
 
 type SavedInvoicesListProps = {
-    setModalState: React.Dispatch<React.SetStateAction<boolean>>;
+  setModalState: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 const SavedInvoicesList = ({ setModalState }: SavedInvoicesListProps) => {
-    const { savedInvoices, onFormSubmit, deleteInvoice } = useInvoiceContext();
+  const { savedInvoices, onFormSubmit, deleteInvoiceById } = useInvoiceContext();
+  const { reset } = useFormContext<InvoiceType>();
 
-    const { reset } = useFormContext<InvoiceType>();
+  // ✅ Corrige datas sem quebrar o tipo (usando "as any")
+  const prepareInvoiceForLoad = (inv: InvoiceType) => {
+    (inv.details as any).invoiceDate = new Date(inv.details.invoiceDate);
+    (inv.details as any).dueDate = new Date(inv.details.dueDate);
 
-    // TODO: Remove "any" from the function below
-    // Update fields when selected invoice is changed.
-    // ? Reason: The fields don't go through validation when invoice loads
-    const updateFields = (selected: any) => {
-        // Next 2 lines are so that when invoice loads,
-        // the dates won't be in the wrong format
-        // ? Selected cannot be of type InvoiceType because of these 2 variables
-        selected.details.dueDate = new Date(selected.details.dueDate);
-        selected.details.invoiceDate = new Date(selected.details.invoiceDate);
+    inv.details.invoiceLogo = "";
+    inv.details.signature = { data: "" };
+  };
 
-        selected.details.invoiceLogo = "";
-        selected.details.signature = {
-            data: "",
-        };
-    };
+  const load = (invoiceDTO: any) => {
+    const selected = invoiceDTO.data;
+    if (!selected) return;
 
-    /**
-     * Transform date values for next submission
-     *
-     * @param {InvoiceType} selected - The selected invoice
-     */
-    const transformDates = (selected: InvoiceType) => {
-        selected.details.dueDate = new Date(
-            selected.details.dueDate
-        ).toLocaleDateString("en-US", DATE_OPTIONS);
-        selected.details.invoiceDate = new Date(
-            selected.details.invoiceDate
-        ).toLocaleDateString("en-US", DATE_OPTIONS);
-    };
+    prepareInvoiceForLoad(selected);
+    reset(selected);
+    setModalState(false);
+  };
 
-    /**
-     * Loads a given invoice into the form.
-     *
-     * @param {InvoiceType} selectedInvoice - The selected invoice
-     */
-    const load = (selectedInvoice: InvoiceType) => {
-        if (selectedInvoice) {
-            updateFields(selectedInvoice);
-            reset(selectedInvoice);
-            transformDates(selectedInvoice);
+  const loadAndGeneratePdf = (invoiceDTO: any) => {
+    load(invoiceDTO);
+    onFormSubmit(invoiceDTO.data);
+  };
 
-            // Close modal
-            setModalState(false);
-        }
-    };
+  return (
+    <div className="flex flex-col gap-5 overflow-y-auto max-h-72">
+      {savedInvoices.map((invoice) => {
+        const d = invoice.data;
+        const sender = d?.sender?.name || d?.from?.name || "Unknown";
+        const receiver = d?.billTo?.name || d?.receiver?.name || "Unknown";
 
-    /**
-     * Loads a given invoice into the form and generates a pdf by submitting the form.
-     *
-     * @param {InvoiceType} selectedInvoice - The selected invoice
-     */
-    const loadAndGeneratePdf = (selectedInvoice: InvoiceType) => {
-        load(selectedInvoice);
+        return (
+          <Card
+            key={invoice.id}
+            className="p-2 border rounded-sm hover:border-blue-500 hover:shadow-lg cursor-pointer"
+          >
+            <CardContent className="flex justify-between">
+              <div>
+                <p className="font-semibold">Invoice #{invoice.id}</p>
 
-        // Submit form
-        onFormSubmit(selectedInvoice);
-    };
+                <small className="text-gray-500">
+                  Date: {new Date(invoice.issueDate).toLocaleDateString()}
+                </small>
 
-    return (
-        <>
-            <div className="flex flex-col gap-5 overflow-y-auto max-h-72">
-                {savedInvoices.map((invoice, idx) => (
-                    <Card
-                        key={idx}
-                        className="p-2 border rounded-sm hover:border-blue-500 hover:shadow-lg cursor-pointer"
-                        // onClick={() => handleSelect(invoice)}
-                    >
-                        <CardContent className="flex justify-between">
-                            <div>
-                                {/* <FileText /> */}
-                                <p className="font-semibold">
-                                    Invoice #{invoice.details.invoiceNumber}{" "}
-                                </p>
-                                <small className="text-gray-500">
-                                    Updated at: {invoice.details.updatedAt}
-                                </small>
+                <div className="mt-2">
+                  <p>Sender: {sender}</p>
+                  <p>Receiver: {receiver}</p>
 
-                                <div>
-                                    <p>Sender: {invoice.sender.name}</p>
-                                    <p>Receiver: {invoice.receiver.name}</p>
-                                    <p>
-                                        Total:{" "}
-                                        <span className="font-semibold">
-                                            {formatNumberWithCommas(
-                                                Number(
-                                                    invoice.details.totalAmount
-                                                )
-                                            )}{" "}
-                                            {invoice.details.currency}
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
+                  <p>
+                    Total:{" "}
+                    <span className="font-semibold">
+                      {formatNumberWithCommas(Number(invoice.total))} USD
+                    </span>
+                  </p>
 
-                            <div className="flex flex-col gap-2">
-                                <BaseButton
-                                    tooltipLabel="Load invoice details into the form"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => load(invoice)}
-                                >
-                                    Load
-                                </BaseButton>
+                  <p>
+                    Status:{" "}
+                    {invoice.status === "paid" ? "✅ Paid" : "⭕ Unpaid"}
+                  </p>
+                </div>
+              </div>
 
-                                <BaseButton
-                                    tooltipLabel="Load invoice and generate PDF"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => loadAndGeneratePdf(invoice)}
-                                >
-                                    Load & Generate
-                                </BaseButton>
-                                {/* Remove Invoice Button */}
-                                <BaseButton
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteInvoice(idx);
-                                    }}
-                                >
-                                    Delete
-                                </BaseButton>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+              <div className="flex flex-col gap-2">
+                <BaseButton
+                  tooltipLabel="Load invoice into the form"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => load(invoice)}
+                >
+                  Load
+                </BaseButton>
 
-                {savedInvoices.length == 0 && (
-                    <div>
-                        <p>No saved invoices</p>
-                    </div>
-                )}
-            </div>
-        </>
-    );
+                <BaseButton
+                  tooltipLabel="Load invoice and generate PDF"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadAndGeneratePdf(invoice)}
+                >
+                  Load & Generate
+                </BaseButton>
+
+                <BaseButton
+                  variant="destructive"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteInvoiceById(invoice.id);
+                  }}
+                >
+                  Delete
+                </BaseButton>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {savedInvoices.length === 0 && (
+        <div>
+          <p>No saved invoices</p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default SavedInvoicesList;
