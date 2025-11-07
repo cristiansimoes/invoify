@@ -27,6 +27,7 @@ import {
     Items,
     PaymentInformation,
     InvoiceSummary,
+    BaseButton,
 } from "@/app/components";
 
 // Contexts
@@ -51,6 +52,30 @@ const InvoiceForm = () => {
         }
     }, [invoiceNumber]);
 
+    const handleGet = () => {
+
+        // open console on your app and run:
+        const out = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            try {
+                out[k] = JSON.parse(localStorage.getItem(k));
+            } catch {
+                out[k] = localStorage.getItem(k);
+            }
+        }
+        const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "localStorage-export.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+
     return (
         <div className={`xl:w-[55%]`}>
             <Card>
@@ -68,6 +93,14 @@ const InvoiceForm = () => {
                         </Badge>
                     </div>
                     <CardDescription>{_t("form.description")}</CardDescription>
+                    <BaseButton
+              type="button"
+            //   tooltipLabel="Generate your invoice"
+            //   loadingText="Generating your invoice"
+            onClick={handleGet}
+            >
+              Get info from localStorage
+            </BaseButton>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-8">
