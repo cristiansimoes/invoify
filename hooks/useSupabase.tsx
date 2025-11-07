@@ -46,7 +46,7 @@ const useSupabase = () => {
             throw error;
         }
 
-        return data as Array<InvoiceTypeReturn>;
+        return data as Array<InvoiceTypeReturnDb>;
     }
 
     async function updateInvoiceDb(

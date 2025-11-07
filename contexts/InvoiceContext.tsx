@@ -33,9 +33,6 @@ import {
 } from "@/lib/invoices-local";
 
 import type { ExportTypes, InvoiceType } from "@/types";
-import { InvoiceSchema } from "@/lib/schemas";
-import z from "zod";
-import { supabase } from "@/lib/supabaseClient";
 
 type Ctx = {
   invoicePdf: Blob;
@@ -81,7 +78,7 @@ export const InvoiceContextProvider = ({ children }: { children: React.ReactNode
     sendPdfError,
     importInvoiceError,
   } = useToasts();
-  const {saveInvoiceDb} = useSupabase()
+  const { saveInvoiceDb } = useSupabase()
 
   /** ---- helpers ---- */
   const extractItems = (data: any) => {
@@ -158,7 +155,6 @@ export const InvoiceContextProvider = ({ children }: { children: React.ReactNode
 
   /** Submit (nova invoice) */
   const onFormSubmit = async (data: InvoiceType) => {
-    // return console.log(JSON.stringify(data))
     const isPaid = user?.publicMetadata?.isPaid === true;
     const count = Number(localStorage.getItem("invoice_count") || 0);
     
