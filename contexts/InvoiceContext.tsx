@@ -41,9 +41,9 @@ type Ctx = {
   savedInvoices: InvoiceDTO[];
   onFormSubmit: (values: InvoiceType) => void;
   newInvoice: () => void;
-  generatePdf: (data: InvoiceType) => Promise<void>;
+  generatePdf: (data: InvoiceType) => Promise<Blob | undefined>;
   removeFinalPdf: () => void;
-  downloadPdf: () => void;
+  downloadPdf: (blob?: Blob) => void;
   printPdf: () => void;
   previewPdfInTab: () => void;
   saveInvoice: () => void;

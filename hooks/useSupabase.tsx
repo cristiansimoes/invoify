@@ -10,6 +10,10 @@ export type InvoiceTypeReturnDb = {
     total_amount: number;
     currency: string;
     data: InvoiceType;
+    created_at: string;
+    id: string;
+    status: string;
+    updated_at: string;
 };
 
 const useSupabase = () => {
@@ -41,8 +45,8 @@ const useSupabase = () => {
             .eq("id", invoiceId)
             .eq("id_user", userId)
             .single(); // ensures you get one object instead of an array
-            // If you only need certain fields (for example, for a preview list or dashboard), add:
-            // .select("id, invoice_number, total_amount, currency, status, created_at")
+        // If you only need certain fields (for example, for a preview list or dashboard), add:
+        // .select("id, invoice_number, total_amount, currency, status, created_at")
 
         if (error) {
             console.error("Error fetching invoice:", error);
@@ -133,7 +137,7 @@ const useSupabase = () => {
         updateInvoiceDb,
         getSummaryDashboard,
         deleteInvoiceDb,
-        getInvoiceByIdDb
+        getInvoiceByIdDb,
     };
 };
 
