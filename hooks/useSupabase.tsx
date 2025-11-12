@@ -34,6 +34,24 @@ const useSupabase = () => {
         return data;
     }
 
+    async function getInvoiceByIdDb(invoiceId: string, userId: string) {
+        const { data, error } = await supabase
+            .from("invoices")
+            .select("*")
+            .eq("id", invoiceId)
+            .eq("id_user", userId)
+            .single(); // ensures you get one object instead of an array
+            // If you only need certain fields (for example, for a preview list or dashboard), add:
+            // .select("id, invoice_number, total_amount, currency, status, created_at")
+
+        if (error) {
+            console.error("Error fetching invoice:", error);
+            throw error;
+        }
+
+        return data;
+    }
+
     async function getAllInvoicesFromIdDb(userId: string) {
         const { data, error } = await supabase
             .from("invoices")
@@ -50,19 +68,56 @@ const useSupabase = () => {
     }
 
     async function updateInvoiceDb(
-        updatedInvoice: z.infer<typeof InvoiceSchema>,
+        updatedInvoice: InvoiceTypeReturnDb,
+        status: string,
         invoiceId: string,
         userId: string
     ) {
         const { data, error } = await supabase
             .from("invoices")
             .update({
-                data: updatedInvoice,
-                total_amount: updatedInvoice.details.totalAmount,
+                data: updatedInvoice.data,
+                total_amount: updatedInvoice.total_amount,
                 updated_at: new Date().toISOString(),
+                id_user: userId,
+                invoice_number: updatedInvoice.invoice_number,
+                currency: updatedInvoice.currency,
+                status,
             })
             .eq("id", invoiceId)
             .eq("id_user", userId);
+
+        if (error) {
+            console.error("Error getting invoice:", error);
+            throw error;
+        }
+
+        return data;
+    }
+
+    async function deleteInvoiceDb(invoiceId: string, userId: string) {
+        const { error } = await supabase
+            .from("invoices")
+            .delete()
+            .eq("id", invoiceId)
+            .eq("id_user", userId);
+
+        if (error) {
+            console.error("Error deleting invoice:", error);
+            throw error;
+        }
+
+        return true;
+    }
+
+    // Get paid_revenue, unpaid_revenue, and total_revenue
+    async function getSummaryDashboard(userId: string) {
+        const { data, error } = await supabase
+            .from("v_invoice_summary_with_change")
+            .select("*")
+            .eq("id_user", userId)
+            .order("month", { ascending: false })
+            .limit(1);
 
         if (error) {
             console.error("Error getting invoice:", error);
@@ -76,6 +131,9 @@ const useSupabase = () => {
         saveInvoiceDb,
         getAllInvoicesFromIdDb,
         updateInvoiceDb,
+        getSummaryDashboard,
+        deleteInvoiceDb,
+        getInvoiceByIdDb
     };
 };
 

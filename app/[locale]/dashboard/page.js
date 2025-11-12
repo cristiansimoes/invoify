@@ -27,6 +27,8 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import useSupabase from "@/hooks/useSupabase";
+import { useUser } from "@clerk/nextjs";
 
 function getMonthKey(dateStr) {
   const d = new Date(dateStr);
@@ -35,60 +37,101 @@ function getMonthKey(dateStr) {
 
 export default function DashboardPage() {
   const {
-    savedInvoices,
-    deleteInvoiceById,
+    // TODO: check this
+    // savedInvoices,
+    // deleteInvoiceById,
+    // loadInvoiceById,
+    // reset,
+    // invoicePdf,
     generatePdf,
     downloadPdf,
-    loadInvoiceById,
-    reset,
-    invoicePdf,
-    markInvoicePaid,
-    markInvoiceUnpaid,
+    // markInvoicePaid,
+    // markInvoiceUnpaid,
   } = useInvoiceContext();
 
-  const [invoices, setInvoices] = useState([]);
+  // 
+  const { getAllInvoicesFromIdDb, getSummaryDashboard, deleteInvoiceDb, updateInvoiceDb } = useSupabase();
+    const { user } = useUser();
+    const [loading, setLoading] = useState(false);
+    const [invoicesListDb, setInvoicesListDb] = useState([]);
+    const [invoicesSummaryDb, setInvoicesSummaryDb] = useState([]);
 
-  // ✅ Normalize invoices
-  useEffect(() => {
-    if (!savedInvoices) return;
+    const getAllInvoicesById = async () => {
+      setLoading(true);
+      try {
+          const list = await getAllInvoicesFromIdDb(user?.id);
+          setInvoicesListDb(list);
+      } finally {
+          setLoading(false);
+      }
+    };
+    
+    const getInvoicesSummary = async () => {
+      setLoading(true);
+      try {
+          const list = await getSummaryDashboard(user?.id);
+          setInvoicesSummaryDb(list[0]);
+      } finally {
+          setLoading(false);
+      }
+    };
 
-    setInvoices(
-      savedInvoices.map((inv) => ({
-        ...inv,
-        total: Number(inv.total || 0),
-        status: inv.status || "unpaid",
-      }))
-    );
-  }, [savedInvoices]);
+    // TODO change for tanstack query and mutations, then create custom hooks to append it
+    useEffect(() => {
+        if (user?.id) {
+          getAllInvoicesById();
+          getInvoicesSummary()
+        }
+    }, [user?.id]);
 
-  // ✅ Revenue totals
-  const paidRevenue = invoices
-    .filter((i) => i.status === "paid")
-    .reduce((a, b) => a + b.total, 0);
+    const handleDeleteInvoice = async (id) => {
+      try {
+        await deleteInvoiceDb(id, user?.id)
+        getAllInvoicesById()
+        getInvoicesSummary()
+      } catch (err) {
+        console.error(err)
+      }
+    }
 
-  const unpaidRevenue = invoices
-    .filter((i) => i.status !== "paid")
-    .reduce((a, b) => a + b.total, 0);
-
-  const totalRevenue = paidRevenue + unpaidRevenue;
+    const handleMarkAsPaid = async (updatedInvoice, id) => {
+      try {
+        await updateInvoiceDb(updatedInvoice, "paid", id, user?.id)
+        getAllInvoicesById()
+        getInvoicesSummary()
+      } catch (e){
+        console.error(e)
+      }
+    }
+    
+    const handleMarkAsUnpaid = async (updatedInvoice, id) => {
+      try {
+        await updateInvoiceDb(updatedInvoice, "unpaid", id, user?.id)
+        getAllInvoicesById()
+        getInvoicesSummary()
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  // 
 
   // ✅ Monthly aggregation
   const monthlyMap = useMemo(() => {
     const map = new Map();
 
-    invoices.forEach((inv) => {
-      const key = getMonthKey(inv.issueDate);
+    invoicesListDb.forEach((inv) => {
+      const key = getMonthKey(inv.data.details.invoiceDate);
 
       if (!map.has(key)) {
         map.set(key, { paid: 0, unpaid: 0 });
       }
 
-      if (inv.status === "paid") map.get(key).paid += inv.total;
-      else map.get(key).unpaid += inv.total;
+      if (inv.status === "paid") map.get(key).paid += inv.total_amount;
+      else map.get(key).unpaid += inv.total_amount;
     });
 
     return map;
-  }, [invoices]);
+  }, [invoicesListDb]);
 
   // ✅ Monthly comparison (%)
   const now = new Date();
@@ -177,14 +220,8 @@ export default function DashboardPage() {
 
   // ✅ PDF
   const handleDownload = async (inv) => {
-    const full = loadInvoiceById(inv.id);
-    if (!full) return alert("Invoice not found");
-
-    if (invoicePdf && invoicePdf.size > 0) return downloadPdf();
-
-    reset(full.data);
-    await generatePdf(full.data);
-    alert("✅ PDF generated! Click again to download.");
+    const blob = await generatePdf(inv.data);
+    downloadPdf(blob)
   };
 
   // ✅ ✅ ✅ LAYOUT FINAL ✅ ✅ ✅
@@ -202,7 +239,7 @@ export default function DashboardPage() {
             <DollarSign className="h-6 w-6 text-green-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-green-700">${paidRevenue.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-green-700">${invoicesSummaryDb?.paid_revenue ? invoicesSummaryDb?.paid_revenue.toFixed(2):''}</p>
             <div className="mt-1 opacity-80">{renderDelta(paidDelta, "paid")}</div>
           </CardContent>
         </Card>
@@ -214,7 +251,7 @@ export default function DashboardPage() {
             <FileText className="h-6 w-6 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-orange-600">${unpaidRevenue.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-orange-600">${invoicesSummaryDb?.unpaid_revenue ? invoicesSummaryDb?.unpaid_revenue?.toFixed(2) : ''}</p>
             <div className="mt-1 opacity-80">{renderDelta(unpaidDelta, "unpaid")}</div>
           </CardContent>
         </Card>
@@ -226,7 +263,7 @@ export default function DashboardPage() {
             <DollarSign className="h-6 w-6 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-blue-700">${totalRevenue.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-blue-700">${invoicesSummaryDb?.total_revenue ? invoicesSummaryDb?.total_revenue?.toFixed(2) : ''}</p>
             <p className="text-sm text-gray-500 mt-1 opacity-60">Sum of all invoices</p>
           </CardContent>
         </Card>
@@ -238,7 +275,7 @@ export default function DashboardPage() {
             <Layers className="h-6 w-6 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-purple-700">{invoices.length}</p>
+            <p className="text-3xl font-bold text-purple-700">{invoicesSummaryDb?.total_invoices}</p>
             <p className="text-sm text-gray-500 mt-1 opacity-60">Documents created</p>
           </CardContent>
         </Card>
@@ -258,32 +295,33 @@ export default function DashboardPage() {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="unpaidRevenue" stackId="rev" fill="#f59e0b" />
-              <Bar dataKey="paidRevenue" stackId="rev" fill="#10b981" />
+              <Bar name='Unpaid Revenue' dataKey="unpaidRevenue" stackId="rev" fill="#f59e0b" />
+              <Bar name='Paid Revenue' dataKey="paidRevenue" stackId="rev" fill="#10b981" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
       {/* LIST */}
-      {invoices.map((inv) => (
+      {invoicesListDb.map((inv) => (
         <Card key={inv.id}>
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
-              <span>Invoice #{inv.id}</span>
+              <span>Invoice #{inv.invoice_number}</span>
 
               <div className="flex gap-2">
                 {inv.status === "paid" ? (
-                  <Button variant="outline" size="sm" onClick={() => markInvoiceUnpaid(inv.id)}>
+                  <Button variant="outline" size="sm" onClick={() => handleMarkAsUnpaid(inv, inv.id)}>
                     ↩️ Unmark Paid
                   </Button>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => markInvoicePaid(inv.id)}>
+                  <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(inv, inv.id)}>
                     ✅ Mark Paid
                   </Button>
                 )}
 
                 <Link href={`/en/invoice/${inv.id}`}>
+                {/* <Link href={`/en/invoice/${inv.data.details.invoiceNumber}`}> */}
                   <Button variant="outline" size="sm">
                     <FileEdit className="w-4 h-4 mr-1" /> Edit
                   </Button>
@@ -296,7 +334,7 @@ export default function DashboardPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => deleteInvoiceById(inv.id)}
+                  onClick={() => handleDeleteInvoice(inv.id)}
                 >
                   <Trash2 className="w-4 h-4 mr-1" /> Delete
                 </Button>
@@ -305,9 +343,9 @@ export default function DashboardPage() {
           </CardHeader>
 
           <CardContent>
-            <p><strong>Client:</strong> {inv.customerName}</p>
-            <p><strong>Total:</strong> ${inv.total.toFixed(2)}</p>
-            <p><strong>Date:</strong> {new Date(inv.issueDate).toLocaleDateString()}</p>
+            <p><strong>Client:</strong> {inv.data.receiver.name}</p>
+            <p><strong>Total:</strong> ${inv.total_amount.toFixed(2)}</p>
+            <p><strong>Date:</strong> {new Date(inv.data.details.invoiceDate).toLocaleDateString()}</p>
             <p><strong>Status:</strong> {inv.status === "paid" ? "✅ Paid" : "⭕ Unpaid"}</p>
           </CardContent>
         </Card>

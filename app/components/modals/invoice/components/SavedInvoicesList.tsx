@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { BaseButton } from "@/app/components";
@@ -8,14 +8,41 @@ import { useInvoiceContext } from "@/contexts/InvoiceContext";
 import { formatNumberWithCommas } from "@/lib/helpers";
 
 import { InvoiceType } from "@/types";
+import { useUser } from "@clerk/nextjs";
+import useSupabase from "@/hooks/useSupabase";
+import { useRouter } from "next/navigation";
 
 type SavedInvoicesListProps = {
   setModalState: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 const SavedInvoicesList = ({ setModalState }: SavedInvoicesListProps) => {
-  const { savedInvoices, onFormSubmit, deleteInvoiceById } = useInvoiceContext();
+  const { 
+    // onFormSubmit, deleteInvoiceById, 
+    downloadPdf, generatePdf } = useInvoiceContext();
   const { reset } = useFormContext<InvoiceType>();
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(false);
+    const [invoicesListDb, setInvoicesListDb] = useState([]);
+    const {user} = useUser()
+  const {getAllInvoicesFromIdDb, deleteInvoiceDb} = useSupabase()
+
+  const getAllInvoicesById = async () => {
+        setLoading(true);
+        try {
+            const list = await getAllInvoicesFromIdDb(user?.id ?? 'ß');
+            setInvoicesListDb(list);
+        } finally {
+            setLoading(false);
+        }
+      };
+  
+       useEffect(() => {
+              if (user?.id) {
+                getAllInvoicesById();
+              }
+          }, [user?.id]);
 
   // ✅ Corrige datas sem quebrar o tipo (usando "as any")
   const prepareInvoiceForLoad = (inv: InvoiceType) => {
@@ -27,22 +54,32 @@ const SavedInvoicesList = ({ setModalState }: SavedInvoicesListProps) => {
   };
 
   const load = (invoiceDTO: any) => {
-    const selected = invoiceDTO.data;
-    if (!selected) return;
-
-    prepareInvoiceForLoad(selected);
-    reset(selected);
+    router.push(`/en/invoice/${invoiceDTO.id}`);
     setModalState(false);
   };
 
-  const loadAndGeneratePdf = (invoiceDTO: any) => {
+  const handleDownload = async (inv) => {
+  const blob = await generatePdf(inv.data);
+  return downloadPdf(blob)
+};
+  const loadAndGeneratePdf = async (invoiceDTO: any) => {
+    await handleDownload(invoiceDTO)
     load(invoiceDTO);
-    onFormSubmit(invoiceDTO.data);
+    setModalState(false);
   };
+
+  const handleDeleteInvoice = async (id) => {
+      try {
+        await deleteInvoiceDb(id, user?.id)
+        getAllInvoicesById()
+      } catch (err) {
+        console.error(err)
+      }
+    }
 
   return (
     <div className="flex flex-col gap-5 overflow-y-auto max-h-72">
-      {savedInvoices.map((invoice) => {
+      {invoicesListDb.map((invoice) => {
         const d = invoice.data;
         const sender = d?.sender?.name || d?.from?.name || "Unknown";
         const receiver = d?.billTo?.name || d?.receiver?.name || "Unknown";
@@ -54,20 +91,20 @@ const SavedInvoicesList = ({ setModalState }: SavedInvoicesListProps) => {
           >
             <CardContent className="flex justify-between">
               <div>
-                <p className="font-semibold">Invoice #{invoice.id}</p>
+                <p className="font-semibold">Invoice #{invoice.invoice_number}</p>
 
                 <small className="text-gray-500">
-                  Date: {new Date(invoice.issueDate).toLocaleDateString()}
+                  Date: {new Date(d.invoiceDate).toLocaleDateString()}
                 </small>
 
                 <div className="mt-2">
-                  <p>Sender: {sender}</p>
-                  <p>Receiver: {receiver}</p>
+                  <p>Sender: {invoice.data.sender.name}</p>
+                  <p>Receiver: {invoice.data.receiver.name}</p>
 
                   <p>
                     Total:{" "}
                     <span className="font-semibold">
-                      {formatNumberWithCommas(Number(invoice.total))} USD
+                      {formatNumberWithCommas(Number(invoice.total_amount))} USD
                     </span>
                   </p>
 
@@ -102,7 +139,7 @@ const SavedInvoicesList = ({ setModalState }: SavedInvoicesListProps) => {
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteInvoiceById(invoice.id);
+                    handleDeleteInvoice(invoice.id);
                   }}
                 >
                   Delete
@@ -113,7 +150,7 @@ const SavedInvoicesList = ({ setModalState }: SavedInvoicesListProps) => {
         );
       })}
 
-      {savedInvoices.length === 0 && (
+      {invoicesListDb.length === 0 && (
         <div>
           <p>No saved invoices</p>
         </div>

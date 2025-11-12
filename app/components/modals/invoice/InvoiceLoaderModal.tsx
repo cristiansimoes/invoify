@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ShadCn
 import {
@@ -17,7 +17,8 @@ import { SavedInvoicesList } from "@/app/components";
 import { ImportJsonButton } from "@/app/components";
 
 // Context
-import { useInvoiceContext } from "@/contexts/InvoiceContext";
+import useSupabase from "@/hooks/useSupabase";
+import { useUser } from "@clerk/nextjs";
 
 type InvoiceLoaderModalType = {
   children: React.ReactNode;
@@ -25,8 +26,27 @@ type InvoiceLoaderModalType = {
 
 const InvoiceLoaderModal = ({ children }: InvoiceLoaderModalType) => {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [invoicesListDb, setInvoicesListDb] = useState([]);
 
-  const { savedInvoices } = useInvoiceContext();
+  const {user} = useUser()
+  const {getAllInvoicesFromIdDb} = useSupabase()
+
+  const getAllInvoicesById = async () => {
+      setLoading(true);
+      try {
+          const list = await getAllInvoicesFromIdDb(user?.id ?? 'ß');
+          setInvoicesListDb(list);
+      } finally {
+          setLoading(false);
+      }
+    };
+
+     useEffect(() => {
+            if (user?.id) {
+              getAllInvoicesById();
+            }
+        }, [user?.id]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -37,13 +57,13 @@ const InvoiceLoaderModal = ({ children }: InvoiceLoaderModalType) => {
           <DialogTitle>Saved Invoices</DialogTitle>
           <DialogDescription>
             <div className="space-y-2">
-              <p>You have {savedInvoices.length} saved invoices</p>
+              {!loading && !!invoicesListDb.length && <span>You have {invoicesListDb?.length} saved invoices</span>}
               <ImportJsonButton setOpen={setOpen}/>
             </div>
           </DialogDescription>
         </DialogHeader>
 
-        <SavedInvoicesList setModalState={setOpen} />
+        {!loading && !!invoicesListDb.length && <SavedInvoicesList setModalState={setOpen} />}
       </DialogContent>
     </Dialog>
   );

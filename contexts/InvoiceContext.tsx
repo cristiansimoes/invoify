@@ -154,7 +154,7 @@ export const InvoiceContextProvider = ({ children }: { children: React.ReactNode
 
 
   /** Submit (nova invoice) */
-  const onFormSubmit = async (data: InvoiceType) => {
+  const onFormSubmit = async (data: InvoiceType) => {console.log('>')
     const isPaid = user?.publicMetadata?.isPaid === true;
     const count = Number(localStorage.getItem("invoice_count") || 0);
     
@@ -191,7 +191,9 @@ export const InvoiceContextProvider = ({ children }: { children: React.ReactNode
       });
       const blob = await res.blob();
       setInvoicePdf(blob);
-      if (blob.size > 0) pdfGenerationSuccess();
+      if (blob.size > 0) {pdfGenerationSuccess();
+        return blob
+      }
     } finally {
       setInvoicePdfLoading(false);
     }
@@ -201,10 +203,10 @@ export const InvoiceContextProvider = ({ children }: { children: React.ReactNode
     if (invoicePdf.size > 0) window.open(URL.createObjectURL(invoicePdf), "_blank");
   };
 
-  const downloadPdf = () => {
-    if (invoicePdf.size === 0) return;
+  const downloadPdf = (blob?: Blob) => {
+    if (invoicePdf.size === 0 && !blob) return;
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(invoicePdf);
+    a.href = URL.createObjectURL(blob ?? invoicePdf);
     a.download = "invoice.pdf";
     a.click();
   };
