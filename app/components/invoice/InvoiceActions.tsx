@@ -24,11 +24,15 @@ import { useTranslationContext } from "@/contexts/TranslationContext";
 // Icons
 import { FileInput, FolderUp, Import, Plus, RotateCcw, Save } from "lucide-react";
 import { useEffect } from "react";
+import { useParams } from "next/navigation";
+import { useFormState } from "react-hook-form";
 
 const InvoiceActions = () => {
   const { invoicePdfLoading, newInvoice, saveInvoice, generatePdf } =
     useInvoiceContext();
   const { _t } = useTranslationContext();
+  const {id} = useParams();
+  const  state = useFormState();
 
   // ✅ Listener para PDF vindo do dashboard
   useEffect(() => {
@@ -42,6 +46,8 @@ const InvoiceActions = () => {
   return () =>
     window.removeEventListener("previewInvoicePdf", handlePreview as EventListener);
 }, [generatePdf]);
+
+const isEditing = !!id
 
   return (
     <div className="xl:w-[45%]">
@@ -104,9 +110,9 @@ const InvoiceActions = () => {
 
             <BaseButton
               type="submit"
-              tooltipLabel="Generate your invoice"
+              tooltipLabel={_t("actions.generatePdf")}
               loading={invoicePdfLoading}
-              loadingText="Generating your invoice"
+              loadingText="Generating your PDF"
             >
               <FileInput /> {_t("actions.generatePdf")}
             </BaseButton>
@@ -114,10 +120,10 @@ const InvoiceActions = () => {
             <BaseButton
               variant="outline"
               tooltipLabel="Save this invoice"
-              onClick={saveInvoice}
-              disabled={invoicePdfLoading}
+              onClick={() => saveInvoice(isEditing, id as string)}
+              disabled={invoicePdfLoading || !state.isValid}
             >
-              <Save /> Save Invoice
+              <Save />{isEditing ?'Edit invoice' : 'Save Invoice'}
             </BaseButton>
           </div>
 

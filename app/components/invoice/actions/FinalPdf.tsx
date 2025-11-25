@@ -57,7 +57,7 @@ export default function FinalPdf() {
                 </BaseButton>
                 <BaseButton
                     tooltipLabel="Download invoice PDF"
-                    onClick={downloadPdf}
+                    onClick={() => downloadPdf(undefined)}
                     size="sm"
                     variant={"outline"}
                 >
@@ -77,7 +77,7 @@ export default function FinalPdf() {
 
                 <BaseButton
                     tooltipLabel="Save invoice in website"
-                    onClick={saveInvoice}
+                    onClick={() => {}}
                     size="sm"
                     variant={"outline"}
                 >

@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ShadCn
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 
 // Components
@@ -17,36 +17,65 @@ import { SavedInvoicesList } from "@/app/components";
 import { ImportJsonButton } from "@/app/components";
 
 // Context
-import { useInvoiceContext } from "@/contexts/InvoiceContext";
+import useSupabase, { InvoiceTypeReturnDb } from "@/hooks/useSupabase";
+import { useUser } from "@clerk/nextjs";
 
 type InvoiceLoaderModalType = {
-  children: React.ReactNode;
+    children: React.ReactNode;
 };
 
 const InvoiceLoaderModal = ({ children }: InvoiceLoaderModalType) => {
-  const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [invoicesListDb, setInvoicesListDb] = useState<InvoiceTypeReturnDb[]>(
+        []
+    );
 
-  const { savedInvoices } = useInvoiceContext();
+    const { user } = useUser();
+    const { getAllInvoicesFromIdDb } = useSupabase();
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    const getAllInvoicesById = async () => {
+        setLoading(true);
+        try {
+            const list = await getAllInvoicesFromIdDb(user?.id ?? "ß");
+            setInvoicesListDb(list);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      <DialogContent>
-        <DialogHeader className="pb-2 border-b">
-          <DialogTitle>Saved Invoices</DialogTitle>
-          <DialogDescription>
-            <div className="space-y-2">
-              <p>You have {savedInvoices.length} saved invoices</p>
-              <ImportJsonButton setOpen={setOpen}/>
-            </div>
-          </DialogDescription>
-        </DialogHeader>
+    useEffect(() => {
+        if (user?.id) {
+            getAllInvoicesById();
+        }
+    }, [user?.id]);
 
-        <SavedInvoicesList setModalState={setOpen} />
-      </DialogContent>
-    </Dialog>
-  );
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+
+            <DialogContent>
+                <DialogHeader className="pb-2 border-b">
+                    <DialogTitle>Saved Invoices</DialogTitle>
+                    <DialogDescription>
+                        <div className="space-y-2">
+                            {!loading && !!invoicesListDb.length && (
+                                <span>
+                                    You have {invoicesListDb?.length} saved
+                                    invoices
+                                </span>
+                            )}
+                            <ImportJsonButton setOpen={setOpen} />
+                        </div>
+                    </DialogDescription>
+                </DialogHeader>
+
+                {!loading && !!invoicesListDb.length && (
+                    <SavedInvoicesList setModalState={setOpen} />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
 };
 
 export default InvoiceLoaderModal;
