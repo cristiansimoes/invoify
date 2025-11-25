@@ -10,13 +10,13 @@ import { useFormContext } from "react-hook-form";
 import { FinalPdf, LivePreview } from "@/app/components";
 
 // Contexts
-import { useInvoiceContext } from "@/contexts/InvoiceContext";
+// import { useInvoiceContext } from "@/contexts/InvoiceContext";
 
 // Types
 import { InvoiceType } from "@/types";
 
 const PdfViewer = () => {
-    const { invoicePdf } = useInvoiceContext();
+    // const { invoicePdf } = useInvoiceContext();
 
     const { watch } = useFormContext<InvoiceType>();
 
@@ -25,11 +25,11 @@ const PdfViewer = () => {
 
     return (
         <div className="my-3">
-            {invoicePdf.size == 0 ? (
+            {/* {invoicePdf.size == 0 ? ( */}
                 <LivePreview data={formValues} />
-            ) : (
+            {/* ) : (
                 <FinalPdf />
-            )}
+            )} */}
         </div>
     );
 };

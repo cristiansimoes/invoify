@@ -55,7 +55,7 @@ export default function InvoiceViewEditPage() {
             <h2 className="text-xl font-bold mb-4">
                 Edit Invoice #{invoiceDetails?.invoice_number ?? "-"}
             </h2>
-            {!!invoiceDetails && <InvoiceMain />}
+            {!!invoiceDetails && <InvoiceMain edit/>}
         </main>
     );
 }

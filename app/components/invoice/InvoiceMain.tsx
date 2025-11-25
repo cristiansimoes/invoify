@@ -17,12 +17,15 @@ import { useInvoiceContext } from "@/contexts/InvoiceContext";
 
 // Types
 import { InvoiceType } from "@/types";
+import { useParams } from "next/navigation";
 
-const InvoiceMain = () => {
+const InvoiceMain = ({edit = false}: {edit?: boolean}) => {
   const { handleSubmit, reset } = useFormContext<InvoiceType>();
 
   // Get the needed values from invoice context
   const { onFormSubmit } = useInvoiceContext();
+  
+  const {id} = useParams();
 
   // ✅ Listen for load invoice event (for View/Edit)
   useEffect(() => {
@@ -38,7 +41,7 @@ const InvoiceMain = () => {
     <>
       <Form {...useFormContext<InvoiceType>()}>
         <form
-          onSubmit={handleSubmit(onFormSubmit, (err) => {
+          onSubmit={handleSubmit((data) => onFormSubmit(data, edit, id as string), (err) => {
             console.log(err);
           })}
         >

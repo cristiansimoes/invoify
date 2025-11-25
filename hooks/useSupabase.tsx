@@ -72,6 +72,32 @@ const useSupabase = () => {
     }
 
     async function updateInvoiceDb(
+        updatedInvoice: InvoiceType,
+        invoiceId: string,
+        userId: string
+    ) {
+        const { data, error } = await supabase
+            .from("invoices")
+            .update({
+                data: updatedInvoice,
+                total_amount: updatedInvoice.details.totalAmount,
+                updated_at: new Date().toISOString(),
+                id_user: userId,
+                invoice_number: updatedInvoice.details.invoiceNumber,
+                currency: updatedInvoice.details.currency,
+            })
+            .eq("id", invoiceId)
+            .eq("id_user", userId);
+
+        if (error) {
+            console.error("Error getting invoice:", error);
+            throw error;
+        }
+
+        return data;
+    }
+
+    async function updateInvoiceStatusDb(
         updatedInvoice: InvoiceTypeReturnDb,
         status: string,
         invoiceId: string,
@@ -134,10 +160,11 @@ const useSupabase = () => {
     return {
         saveInvoiceDb,
         getAllInvoicesFromIdDb,
-        updateInvoiceDb,
+        updateInvoiceStatusDb,
         getSummaryDashboard,
         deleteInvoiceDb,
         getInvoiceByIdDb,
+        updateInvoiceDb
     };
 };
 

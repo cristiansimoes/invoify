@@ -50,7 +50,7 @@ export default function DashboardPage() {
   } = useInvoiceContext();
 
   // 
-  const { getAllInvoicesFromIdDb, getSummaryDashboard, deleteInvoiceDb, updateInvoiceDb } = useSupabase();
+  const { getAllInvoicesFromIdDb, getSummaryDashboard, deleteInvoiceDb, updateInvoiceStatusDb } = useSupabase();
     const { user } = useUser();
     const [loading, setLoading] = useState(false);
     const [invoicesListDb, setInvoicesListDb] = useState([]);
@@ -96,7 +96,7 @@ export default function DashboardPage() {
 
     const handleMarkAsPaid = async (updatedInvoice, id) => {
       try {
-        await updateInvoiceDb(updatedInvoice, "paid", id, user?.id)
+        await updateInvoiceStatusDb(updatedInvoice, "paid", id, user?.id)
         getAllInvoicesById()
         getInvoicesSummary()
       } catch (e){
@@ -106,7 +106,7 @@ export default function DashboardPage() {
     
     const handleMarkAsUnpaid = async (updatedInvoice, id) => {
       try {
-        await updateInvoiceDb(updatedInvoice, "unpaid", id, user?.id)
+        await updateInvoiceStatusDb(updatedInvoice, "unpaid", id, user?.id)
         getAllInvoicesById()
         getInvoicesSummary()
       } catch (e) {
